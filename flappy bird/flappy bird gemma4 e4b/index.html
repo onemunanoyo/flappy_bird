@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird Clone</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #87CEEB; /* Sky blue background */
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        canvas {
+            border: 5px solid #333;
+            background-color: #70c5ce; /* Lighter sky blue for the game area */
+            display: block;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="320" height="520"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- Game Constants ---
+        const GAME_WIDTH = canvas.width;
+        const GAME_HEIGHT = canvas.height;
+        const GROUND_HEIGHT = 50;
+        const PIPE_WIDTH = 60;
+        const PIPE_GAP = 120;
+        const GRAVITY = 0.6;
+        const JUMP_STRENGTH = -10;
+        const PIPE_SPEED = 3;
+        const PARALLAX_SPEED = 0.5;
+
+        // --- Game Objects ---
+        let bird = {
+            x: 50,
+            y: GAME_HEIGHT / 2 - 15,
+            radius: 12,
+            velocity: 0,
+            draw() {
+                ctx.fillStyle = 'yellow';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.fill();
+                // Add a simple eye
+                ctx.fillStyle = 'black';
+                ctx.beginPath();
+                ctx.arc(this.x + 5, this.y - 3, 2, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.fill();
+            },
+            update() {
+                this.velocity += GRAVITY;
+                this.y += this.velocity;
+                // Limit vertical movement to prevent infinite scrolling
+                if (this.y > GAME_HEIGHT - GROUND_HEIGHT - this.radius) {
+                    this.y = GAME_HEIGHT - GROUND_HEIGHT - this.radius;
+                    this.velocity = 0;
+                }
+            },
+            flap() {
+                this.velocity = JUMP_STRENGTH;
+            }
+        };
+
+        let pipes = [];
+        let score = 0;
+        let gameLoop;
+        let gameState = 'starting'; // 'starting', 'running', 'gameover'
+
+        // --- Parallax Background ---
+        let bgScrollOffset = 0;
+        const backgroundLayers = [
+            { color: '#87CEEB', speed: 1, height: 100 }, // Sky layer (light blue)
+            { color: '#6b8e23', speed: 0.8, height: 50 }  // Green layer (trees/bushes)
+        ];
+        
+        function drawBackground() {
+            // 1. Draw Sky (Base)
+            ctx.fillStyle = backgroundLayers[0].color;
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT - GROUND_HEIGHT);
+
+            // 2. Draw Parallax Layers
+            for (let i = 0; i < backgroundLayers.length; i++) {
+                const layer = backgroundLayers[i];
+                // The offset cycles over the width of the canvas plus a partial width for continuity
+                const x1 = (bgScrollOffset * layer.speed) % GAME_WIDTH;
+                const x2 = (x1 + GAME_WIDTH) % GAME_WIDTH;
+
+                // Draw the layer segment
+                ctx.fillStyle = layer.color;
+                ctx.fillRect(0, 0, GAME_WIDTH, layer.height);
+
+                // Draw the wrap-around segment
+                if (x1 + GAME_WIDTH > GAME_WIDTH) {
+                    // If the layer segment partially goes off the right edge, draw the wrap-around part
+                    ctx.fillRect(x2, 0, GAME_WIDTH - x2, layer.height);
+                } else if (x1 > 0) {
+                    // If the layer segment partially sits off the left edge, draw the wrap-around part
+                    ctx.fillRect(0, 0, x1, layer.height);
+                }
+            }
+
+            // 3. Draw Ground
+            ctx.fillStyle = '#D2B48C'; // Tan/sand color
+            ctx.fillRect(0, GAME_HEIGHT - GROUND_HEIGHT, GAME_WIDTH, GROUND_HEIGHT);
+            
+            // 4. Draw subtle ground texture/line
+            ctx.strokeStyle = '#8B4513'; // Brown border
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, GAME_HEIGHT - GROUND_HEIGHT);
+            ctx.lineTo(GAME_WIDTH, GAME_HEIGHT - GROUND_HEIGHT);
+            ctx.stroke();
+        }
+
+        // --- Pipe Functions ---
+        function Pipe(x, gapY) {
+            this.x = x;
+            this.gapY = gapY;
+            this.width = PIPE_WIDTH;
+            this.height = PIPE_GAP;
+            this.scored = false;
+
+            this.draw = function() {
+                ctx.fillStyle = '#4CAF50'; // Green pipes
+                
+                // Top pipe
+                ctx.fillRect(this.x, 0, this.width, this.gapY - this.height / 2);
+                
+                // Bottom pipe
+                const bottomY = this.gapY + this.height / 2;
+                const bottomHeight = GAME_HEIGHT - GROUND_HEIGHT - bottomY;
+                ctx.fillRect(this.x, bottomY, this.width, bottomHeight);
+
+                // Optional: Pipe borders for definition
+                ctx.strokeStyle = '#388E3C';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x, 0, this.width, this.gapY - this.height / 2);
+                ctx.strokeRect(this.x, bottomY, this.width, bottomHeight);
+            };
+
+            this.update = function() {
+                this.x -= PIPE_SPEED;
+            };
+        }
+
+        // --- Collision Detection ---
+        function checkCollision(pipe) {
+            // Check if the bird is horizontally aligned with the pipe
+            const isCollidingX = bird.x + bird.radius > pipe.x && bird.x - bird.radius < pipe.x + pipe.width;
+
+            if (isCollidingX) {
+                // Check collision with Top pipe
+                const topPipeBottom = pipe.gapY - (pipe.height / 2);
+                if (bird.y - bird.radius < topPipeBottom) {
+                    return true; // Hit top pipe
+                }
+
+                // Check collision with Bottom pipe
+                const bottomPipeTop = pipe.gapY + (pipe.height / 2);
+                if (bird.y + bird.radius > GAME_HEIGHT - GROUND_HEIGHT - (bottomPipeTop + (GAME_HEIGHT - GROUND_HEIGHT - (pipe.gapY + pipe.height / 2))) ) {
+                    return true; // Hit bottom pipe
+                }
+            }
+            return false;
+        }
+        
+        function checkBoundaryCollision() {
+            // Ground/Ceiling collision
+            const ceilingHit = bird.y - bird.radius < 0;
+            const groundHit = bird.y + bird.radius > GAME_HEIGHT - GROUND_HEIGHT;
+            return ceilingHit || groundHit;
+        }
+
+        function handleScore(pipes) {
+            for (let i = 0; i < pipes.length; i++) {
+                const pipe = pipes[i];
+                // Check if bird has passed the pipe AND hasn't been scored yet
+                if (pipe.x + pipe.width < bird.x - bird.radius && !pipe.scored) {
+                    score++;
+                    pipe.scored = true;
+                }
+            }
+        }
+
+        // --- Game Loop Functions ---
+        function updateGame() {
+            // Update background position
+            bgScrollOffset = (bgScrollOffset + PIPE_SPEED * PARALLAX_SPEED) % GAME_WIDTH;
+
+            // Update and draw pipes
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                const pipe = pipes[i];
+                pipe.update();
+                pipe.draw();
+
+                // Scoring check
+                handleScore([pipe]);
+
+                // Collision check
+                if (checkCollision(pipe)) {
+                    gameOver();
+                    return;
+                }
+
+                // Remove pipe if off-screen
+                if (pipe.x + pipe.width < 0) {
+                    pipes.splice(i, 1);
+                }
+            }
+
+            // Update and draw bird
+            bird.update();
+            bird.draw();
+        }
+
+        function draw() {
+            // Clear canvas
+            ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            // Draw background and ground
+            drawBackground();
+
+            // Draw pipes (draw is called inside updateGame, but we ensure they render here)
+            pipes.forEach(p => p.draw());
+            
+            // Draw Bird (draw is called inside updateGame, but we ensure it renders here)
+            bird.draw();
+
+            // Draw Score
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+            ctx.font = '48px Arial';
+            ctx.textAlign = 'center';
+            ctx.strokeText(score.toString(), GAME_WIDTH / 2, 60);
+            ctx.fillText(score.toString(), GAME_WIDTH / 2, 60);
+        }
+
+        function gameLoopFunction() {
+            if (gameState === 'running') {
+                updateGame();
+                draw();
+                gameLoop = requestAnimationFrame(gameLoopFunction);
+            } else if (gameState === 'starting') {
+                draw(); // Draw initial state
+            } else if (gameState === 'gameover') {
+                 draw(); // Draw final state
+            }
+        }
+
+        // --- State Handlers ---
+        function initializeGame() {
+            // Initial Pipes setup (start with a couple already on screen)
+            pipes = [
+                new Pipe(GAME_WIDTH + 20, GAME_HEIGHT / 2),
+                new Pipe(GAME_WIDTH - 20, GAME_HEIGHT / 2 + 30)
+            ];
+            score = 0;
+            bird.y = GAME_HEIGHT / 2 - 15;
+            bird.velocity = 0;
+            
+            // Ensure state is transitioned correctly if starting fresh
+            if (gameState === 'starting') {
+                 gameState = 'running';
+            }
+            
+            // Start/Resume loop
+            if (!gameLoop) {
+                gameLoopFunction();
+            }
+        }
+
+        function startGame() {
+            if (gameState === 'starting' || gameState === 'gameover') {
+                initializeGame();
+            }
+        }
+        
+        function gameOver() {
+            gameState = 'gameover';
+            cancelAnimationFrame(gameLoop); // Stop the loop
+            
+            // Display Game Over message and score
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            ctx.fillStyle = 'white';
+            ctx.font = '60px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Game Over', GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30);
+            
+            ctx.font = '36px Arial';
+            ctx.fillText(`Score: ${score}`, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 30);
+            
+            ctx.font = '24px Arial';
+            ctx.fillText('Click/Tap to Restart', GAME_WIDTH / 2, GAME_HEIGHT / 2 + 80);
+        }
+
+        // --- Input Handlers ---
+        function handleJump(event) {
+            // Check if the game is running or if it's the starting/gameover screen
+            if (gameState === 'running') {
+                bird.flap();
+            } else if (gameState === 'starting' || gameState === 'gameover') {
+                startGame();
+            }
+        }
+
+        // Keyboard input
+        document.addEventListener('mousedown', handleJump); // Mouse click / Tap
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.key === ' ') {
+                handleJump(e);
+            }
+        });
+
+        // Game initialization call
+        // Start the canvas drawing immediately so the initial state is visible
+        gameLoopFunction();
+
+        // --- Pipe Spawner ---
+        function spawnPipes() {
+            // Base position is off-screen right
+            const x = GAME_WIDTH + 20;
+            // Gap center Y position (randomizing keeps it interesting)
+            // The gap should be centered roughly between 70px and GAME_HEIGHT - 70px
+            const minY = 70;
+            const maxY = GAME_HEIGHT - GROUND_HEIGHT - 70;
+            const gapY = Math.random() * (maxY - minY) + minY;
+            
+            pipes.push(new Pipe(x, gapY));
+        }
+
+        // Timer loop to spawn pipes (approximately every 1.8 seconds)
+        setInterval(() => {
+            if (gameState === 'running') {
+                spawnPipes();
+            }
+        }, 1800);
+
+    </script>
+</body>
+</html>
