@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>ふわふわバード | Cute Flappy</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Segoe UI", sans-serif;
+    background: linear-gradient(180deg, #8ec9ff 0%, #c4e6ff 55%, #ffe8f3 100%);
+    padding: 16px;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 420px;
+  }
+  h1 {
+    color: #fff;
+    font-size: 22px;
+    letter-spacing: 1px;
+    text-shadow: 0 2px 0 #ff9ec6, 0 4px 12px rgba(255,158,198,.5);
+  }
+  h1 span { color: #fff85d; }
+  .game-box {
+    position: relative;
+    width: 100%;
+    border-radius: 22px;
+    overflow: hidden;
+    border: 5px solid #fff;
+    box-shadow: 0 12px 32px rgba(120,140,255,.35), 0 4px 0 rgba(255,255,255,.8) inset;
+    background: #aee2ff;
+    touch-action: none;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 400 / 600;
+    cursor: pointer;
+  }
+  .hud-top {
+    position: absolute;
+    top: 12px; left: 0; right: 0;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+  #score {
+    font-size: 42px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 3px 0 #ff9ec6, 0 0 0 #fff, 0 5px 12px rgba(0,0,0,.15);
+    -webkit-text-stroke: 2px #ff7fb2;
+    paint-order: stroke fill;
+    line-height: 1;
+  }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(90,110,180,.28);
+    backdrop-filter: blur(2px);
+    transition: opacity .25s;
+  }
+  .overlay.hidden { opacity: 0; pointer-events: none; }
+  .card {
+    background: #fffdf5;
+    border: 4px solid #fff;
+    outline: 3px solid #ffb7d5;
+    border-radius: 20px;
+    padding: 22px 24px;
+    text-align: center;
+    width: 100%;
+    max-width: 290px;
+    box-shadow: 0 10px 24px rgba(255,130,170,.35);
+    animation: pop .35s cubic-bezier(.2,1.6,.4,1);
+  }
+  @keyframes pop { from { transform: scale(.8) translateY(10px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+  .card h2 { color: #ff6fa5; font-size: 24px; margin-bottom: 4px; }
+  .card p { color: #8a8aa8; font-size: 13px; margin-bottom: 12px; }
+  .bird-emoji { font-size: 44px; animation: bounce 1s ease-in-out infinite; display: block; }
+  @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+  .score-row {
+    display: flex;
+    gap: 10px;
+    margin: 12px 0 16px;
+  }
+  .score-box {
+    flex: 1;
+    background: #fff3f8;
+    border: 2px dashed #ffb7d5;
+    border-radius: 14px;
+    padding: 8px;
+  }
+  .score-box small { display: block; color: #ff8fb7; font-size: 11px; font-weight: 700; }
+  .score-box strong { font-size: 26px; color: #5a5a7a; }
+  #best-new {
+    display: none;
+    background: #fff85d;
+    color: #ff6f91;
+    font-size: 11px;
+    font-weight: 800;
+    border-radius: 999px;
+    padding: 2px 10px;
+    margin-top: 4px;
+  }
+  #best-new.show { display: inline-block; animation: pop .3s; }
+  button {
+    width: 100%;
+    border: none;
+    border-radius: 999px;
+    padding: 13px;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    color: #fff;
+    background: linear-gradient(180deg, #ff9ec6, #ff6fa5);
+    box-shadow: 0 4px 0 #e14e83, 0 6px 14px rgba(255,111,165,.4);
+    transition: transform .08s;
+  }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 #e14e83; }
+  .hint {
+    color: #fff;
+    background: rgba(255,111,165,.85);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  }
+  .keys { font-size: 11px; color: #7a7aa0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🐤 ふわふわ <span>バード</span></h1>
+  <div class="game-box" id="gameBox">
+    <canvas id="game" width="400" height="600"></canvas>
+    <div class="hud-top"><div id="score">0</div></div>
+
+    <div class="overlay" id="readyScreen">
+      <div class="card">
+        <span class="bird-emoji">🐤</span>
+        <h2>ふわふわバード</h2>
+        <p>タップ / Space / クリックで<br>はばたいて土管をよけよう！</p>
+        <button id="startBtn">▶ スタート</button>
+        <div style="height:8px"></div>
+        <div class="keys">ベスト記録は自動保存されるよ</div>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="overScreen">
+      <div class="card">
+        <span class="bird-emoji">😵‍💫</span>
+        <h2>ゲームオーバー</h2>
+        <p>おつかれさま！もう一回？</p>
+        <div class="score-row">
+          <div class="score-box"><small>SCORE</small><strong id="finalScore">0</strong></div>
+          <div class="score-box"><small>BEST</small><strong id="bestScore">0</strong><br><span id="best-new">🎉 NEW!</span></div>
+        </div>
+        <button id="retryBtn">↻ もう一度あそぶ</button>
+      </div>
+    </div>
+  </div>
+  <div class="hint">Space / クリック / タップ ではばたく</div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const GROUND_H = 82;
+
+  const scoreEl = document.getElementById('score');
+  const readyScreen = document.getElementById('readyScreen');
+  const overScreen = document.getElementById('overScreen');
+  const finalScoreEl = document.getElementById('finalScore');
+  const bestScoreEl = document.getElementById('bestScore');
+  const bestNewEl = document.getElementById('best-new');
+
+  // なめらかに感じるための物理定数は60fps基準で、実fps差はdtで吸収する
+  const GRAVITY = 0.38;
+  const FLAP_VY = -6.8;
+  const MAX_FALL = 9.5;
+  const PIPE_W = 66;
+  const PIPE_SPACING = 225;
+  const BASE_SPEED = 2.2;
+
+  let state = 'ready'; // ready | play | over
+  let frames = 0;
+  let speed = BASE_SPEED;
+  let score = 0;
+  let best = Number(localStorage.getItem('fuwa-bird-best') || 0);
+  let overTimer = 0;
+
+  const bird = { x: 110, y: H * 0.42, vy: 0, r: 14, wing: 0, rot: 0 };
+
+  let pipes = [];
+  let clouds = [];
+  let hills = [];
+  let particles = [];
+  let groundX = 0;
+  let hillX = 0;
+  let bushX = 0;
+
+  // 視差背景が最初から埋まるように初期配置する（起動直後の空白防止）
+  function initScenery() {
+    clouds = [];
+    for (let i = 0; i < 6; i++) {
+      clouds.push({ x: Math.random() * W, y: 30 + Math.random() * 200, s: 0.6 + Math.random() * 0.9 });
+    }
+    hills = [];
+    for (let i = 0; i < 5; i++) {
+      hills.push({ x: i * 110, w: 120 + Math.random() * 60, h: 60 + Math.random() * 50 });
+    }
+  }
+
+  function reset() {
+    bird.y = H * 0.42;
+    bird.vy = 0;
+    bird.rot = 0;
+    pipes = [];
+    particles = [];
+    frames = 0;
+    speed = BASE_SPEED;
+    score = 0;
+    overTimer = 0;
+    scoreEl.textContent = '0';
+    // 最初の一本は画面外から出して、準備中にいきなり当たらないようにする
+    pipes.push(makePipe(W + 120));
+  }
+
+  // 上手い人ほど少し難しく感じるよう、進むほど隙間を gently 絞る
+  function gapForScore(s) {
+    return Math.max(132, 162 - s * 1.6);
+  }
+
+  function makePipe(x) {
+    const gap = gapForScore(score);
+    const margin = 90;
+    const minY = margin + gap / 2;
+    const maxY = H - GROUND_H - margin - gap / 2;
+    const cy = minY + Math.random() * (maxY - minY);
+    return { x, cy, gap, passed: false, wob: Math.random() * Math.PI * 2 };
+  }
+
+  // --- かわいい効果音（外部ファイル不要にするため内蔵シンセ） ---
+  let audioCtx = null;
+  function beep(freq, dur, type = 'sine', vol = 0.12, slide = 0) {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), audioCtx.currentTime + dur);
+      g.gain.setValueAtTime(vol, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+      o.connect(g).connect(audioCtx.destination);
+      o.start();
+      o.stop(audioCtx.currentTime + dur);
+    } catch (e) { /* 音が出なくても遊べるように無視 */ }
+  }
+
+  function flap() {
+    bird.vy = FLAP_VY;
+    bird.wing = 1; // 羽ばたきアニメを最初から再生するための合図
+    // 羽の綿ぼこりを散らして、跳ねた感触を目で補強する
+    for (let i = 0; i < 5; i++) {
+      particles.push({
+        x: bird.x - 10, y: bird.y + 8,
+        vx: -1 - Math.random() * 1.5, vy: 0.5 + Math.random() * 1.5,
+        life: 1, r: 2 + Math.random() * 2.5
+      });
+    }
+    beep(520, 0.09, 'sine', 0.1, 220);
+  }
+
+  function addScore() {
+    score++;
+    scoreEl.textContent = score;
+    // 少しずつ速くして、マンネリで飽きないようにする
+    speed = BASE_SPEED + Math.min(1.4, score * 0.06);
+    // キラキラで「入った！」を強調する
+    for (let i = 0; i < 10; i++) {
+      particles.push({
+        x: bird.x + 10, y: bird.y - 10,
+        vx: (Math.random() - 0.5) * 3, vy: -1 - Math.random() * 2,
+        life: 1, r: 1.5 + Math.random() * 2, star: true
+      });
+    }
+    beep(880, 0.12, 'triangle', 0.1, 440);
+    setTimeout(() => beep(1320, 0.14, 'triangle', 0.08), 70);
+  }
+
+  function gameOver() {
+    if (state !== 'play') return;
+    state = 'over';
+    overTimer = 0;
+    beep(220, 0.35, 'sawtooth', 0.08, -140);
+    setTimeout(() => beep(140, 0.4, 'sawtooth', 0.07, -60), 150);
+    // 落下の衝撃を土ぼこりで表現する
+    for (let i = 0; i < 14; i++) {
+      particles.push({
+        x: bird.x, y: Math.min(bird.y + 12, H - GROUND_H),
+        vx: (Math.random() - 0.5) * 4, vy: -Math.random() * 3,
+        life: 1, r: 2 + Math.random() * 3
+      });
+    }
+    const isNew = score > best;
+    if (isNew) {
+      best = score;
+      localStorage.setItem('fuwa-bird-best', String(best));
+    }
+    finalScoreEl.textContent = score;
+    bestScoreEl.textContent = best;
+    bestNewEl.classList.toggle('show', isNew);
+  }
+
+  function startGame() {
+    reset();
+    state = 'play';
+    readyScreen.classList.add('hidden');
+    overScreen.classList.add('hidden');
+    // 初回タップの無音ブラウザ対策：ここで音を unlock する
+    beep(660, 0.07, 'sine', 0.06, 120);
+  }
+
+  function showGameOver() {
+    overScreen.classList.remove('hidden');
+  }
+
+  // --- 更新 ---
+  function update(dt) {
+    frames += dt;
+
+    // 背景は常に動かして、待機中も生きている感じを出す
+    const scroll = (state === 'play' ? speed : 0.6) * dt;
+    groundX = (groundX + scroll) % 48;
+    hillX = (hillX + scroll * 0.4) % 220;
+    bushX = (bushX + scroll * 0.7) % 160;
+    for (const c of clouds) {
+      c.x -= (0.25 + c.s * 0.15) * dt * (state === 'play' ? 2 : 1);
+      if (c.x < -90) { c.x = W + 90; c.y = 30 + Math.random() * 200; }
+    }
+
+    // パーティクルは状態によらず寿命で消す（残像防止）
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.vy += 0.08 * dt;
+      p.life -= 0.025 * dt;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    if (state === 'ready') {
+      // 待機中は正弦波で漂わせて「押したくなる」誘導にする
+      bird.y = H * 0.42 + Math.sin(frames * 0.06) * 10;
+      bird.rot = Math.sin(frames * 0.06 + 0.5) * 0.08;
+      bird.wing = (bird.wing + 0.08 * dt) % 1;
+      return;
+    }
+
+    if (state === 'over') {
+      overTimer += dt;
+      // 死んだ後も地面までは自然に落として、埋まらないよう止める
+      if (bird.y < H - GROUND_H - bird.r) {
+        bird.vy = Math.min(bird.vy + GRAVITY * dt, MAX_FALL);
+        bird.y += bird.vy * dt;
+        bird.rot = Math.min(Math.PI / 2, bird.rot + 0.08 * dt);
+      } else {
+        bird.y = H - GROUND_H - bird.r;
+      }
+      if (overTimer > 35) showGameOver();
+      return;
+    }
+
+    // --- play ---
+    bird.vy = Math.min(bird.vy + GRAVITY * dt, MAX_FALL);
+    bird.y += bird.vy * dt;
+    // 急上昇→急降下の傾きで速度感を伝える（回転しすぎ防止に clamp）
+    const targetRot = bird.vy < 0 ? -0.35 : Math.min(Math.PI / 2.4, bird.vy * 0.09);
+    bird.rot += (targetRot - bird.rot) * 0.2 * dt;
+    bird.wing = (bird.wing + (bird.vy < 0 ? 0.35 : 0.12) * dt) % 1;
+
+    // 土管の生成・移動・破棄
+    const last = pipes[pipes.length - 1];
+    if (!last || last.x < W - PIPE_SPACING) pipes.push(makePipe(W + 20));
+    for (let i = pipes.length - 1; i >= 0; i--) {
+      const p = pipes[i];
+      p.x -= speed * dt;
+      p.wob += 0.03 * dt;
+      if (!p.passed && p.x + PIPE_W < bird.x - bird.r) {
+        p.passed = true;
+        addScore();
+      }
+      if (p.x < -PIPE_W - 20) pipes.splice(i, 1);
+    }
+
+    // 天井は優しく押し戻す（即死だと初心者が辛いため）
+    if (bird.y < bird.r) { bird.y = bird.r; bird.vy = 0; }
+
+    // 地面衝突
+    if (bird.y + bird.r >= H - GROUND_H) {
+      bird.y = H - GROUND_H - bird.r;
+      gameOver();
+      return;
+    }
+
+    // 土管衝突（円 vs 矩形で角も公平に判定）
+    for (const p of pipes) {
+      const gapTop = p.cy - p.gap / 2;
+      const gapBot = p.cy + p.gap / 2;
+      if (circleRect(bird.x, bird.y, bird.r - 2, p.x, -20, PIPE_W, gapTop + 20) ||
+          circleRect(bird.x, bird.y, bird.r - 2, p.x, gapBot, PIPE_W, H - GROUND_H - gapBot)) {
+        gameOver();
+        return;
+      }
+    }
+  }
+
+  function circleRect(cx, cy, r, rx, ry, rw, rh) {
+    const nx = Math.max(rx, Math.min(cx, rx + rw));
+    const ny = Math.max(ry, Math.min(cy, ry + rh));
+    const dx = cx - nx, dy = cy - ny;
+    return dx * dx + dy * dy < r * r;
+  }
+
+  // --- 描画 ---
+  function draw() {
+    drawSky();
+    drawClouds();
+    drawHills();
+    drawPipes();
+    drawBushes();
+    drawGround();
+    drawParticles();
+    drawBird();
+    if (state === 'ready') drawTapHint();
+  }
+
+  function drawSky() {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#7ec8ff');
+    g.addColorStop(0.55, '#bfe9ff');
+    g.addColorStop(0.78, '#ffe6f1');
+    g.addColorStop(1, '#ffe9c9');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // お日さまは固定で、迷子防止の目印にする
+    ctx.save();
+    ctx.fillStyle = '#fff6b8';
+    ctx.strokeStyle = '#ffd93d';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(325, 85, 32, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ff9ec6';
+    ctx.beginPath(); ctx.arc(315, 80, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(335, 80, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#ff9ec6';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(325, 88, 7, 0.2, Math.PI - 0.2); ctx.stroke();
+    ctx.restore();
+  }
+
+  function cloudShape(x, y, s) {
+    ctx.beginPath();
+    ctx.arc(x, y, 18 * s, 0, Math.PI * 2);
+    ctx.arc(x + 20 * s, y - 8 * s, 22 * s, 0, Math.PI * 2);
+    ctx.arc(x + 42 * s, y, 18 * s, 0, Math.PI * 2);
+    ctx.arc(x + 21 * s, y + 8 * s, 20 * s, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawClouds() {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,.92)';
+    for (const c of clouds) {
+      ctx.globalAlpha = 0.9;
+      cloudShape(c.x, c.y, c.s);
+      ctx.globalAlpha = 1;
+      // ほっぺを付けてただの背景にしない
+      ctx.fillStyle = 'rgba(255,158,198,.5)';
+      ctx.beginPath();
+      ctx.arc(c.x + 12 * c.s, c.y + 6 * c.s, 4 * c.s, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.92)';
+    }
+    ctx.restore();
+  }
+
+  function drawHills() {
+    ctx.save();
+    // 遠景は薄く、近景は濃くして奥行きを錯覚させる
+    ctx.fillStyle = '#b8e6b8';
+    for (let x = -hillX - 110; x < W + 110; x += 220) {
+      ctx.beginPath();
+      ctx.arc(x + 110, H - GROUND_H + 18, 95, Math.PI, 0);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#8fd694';
+    for (let x = -hillX * 0.5 - 60; x < W + 120; x += 260) {
+      ctx.beginPath();
+      ctx.arc(x, H - GROUND_H + 26, 60, Math.PI, 0);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawPipeBody(x, y, w, h, isTop) {
+    const g = ctx.createLinearGradient(x, 0, x + w, 0);
+    g.addColorStop(0, '#5fb85f');
+    g.addColorStop(0.25, '#a8e6a3');
+    g.addColorStop(0.55, '#7ed07e');
+    g.addColorStop(1, '#4da34d');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = '#2f7a33';
+    ctx.lineWidth = 3;
+    roundRect(x, y, w, h, 8);
+    ctx.fill();
+    ctx.stroke();
+    // つやを入れてプラスチックっぽい可愛さにする
+    ctx.fillStyle = 'rgba(255,255,255,.35)';
+    roundRect(x + 8, y + 6, 10, h - 12, 5);
+    ctx.fill();
+    // キャップ（口の部分）
+    const capH = 24;
+    const cy = isTop ? y + h - capH : y;
+    ctx.fillStyle = '#8ede8a';
+    ctx.strokeStyle = '#2f7a33';
+    roundRect(x - 4, cy, w + 8, capH, 8);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.45)';
+    roundRect(x + 4, cy + 4, 10, capH - 8, 5);
+    ctx.fill();
+  }
+
+  function drawPipes() {
+    for (const p of pipes) {
+      const gapTop = p.cy - p.gap / 2;
+      const gapBot = p.cy + p.gap / 2;
+      drawPipeBody(p.x, -10, PIPE_W, gapTop + 10, true);
+      drawPipeBody(p.x, gapBot, PIPE_W, H - GROUND_H - gapBot, false);
+      // 通り道の合図に小さなお花を揺らす
+      const fx = p.x + PIPE_W / 2 + Math.sin(p.wob) * 2;
+      ctx.fillStyle = '#fff';
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 + p.wob * 0.3;
+        ctx.beginPath();
+        ctx.arc(fx + Math.cos(a) * 6, p.cy + Math.sin(a) * 6, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#ffd93d';
+      ctx.beginPath(); ctx.arc(fx, p.cy, 5, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function drawBushes() {
+    ctx.save();
+    ctx.fillStyle = '#6fbf73';
+    for (let x = -bushX - 80; x < W + 80; x += 160) {
+      ctx.beginPath();
+      ctx.arc(x, H - GROUND_H + 6, 26, Math.PI, 0);
+      ctx.arc(x + 30, H - GROUND_H + 6, 20, Math.PI, 0);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawGround() {
+    const gy = H - GROUND_H;
+    ctx.fillStyle = '#f7e08b';
+    ctx.fillRect(0, gy, W, GROUND_H);
+    ctx.fillStyle = '#7ed07e';
+    ctx.fillRect(0, gy, W, 18);
+    ctx.fillStyle = '#5fb85f';
+    ctx.fillRect(0, gy + 18, W, 5);
+    // 地面の縞で速度感を出す（止まると死んだように見えるため）
+    ctx.fillStyle = '#e8c96a';
+    for (let x = -groundX - 48; x < W + 48; x += 48) {
+      ctx.save();
+      ctx.translate(x, gy + 46);
+      ctx.rotate(-0.15);
+      ctx.fillRect(0, 0, 26, 10);
+      ctx.restore();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    for (let x = -groundX - 48; x < W + 48; x += 48) {
+      ctx.beginPath();
+      ctx.arc(x + 12, gy + 32, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawParticles() {
+    ctx.save();
+    for (const p of particles) {
+      ctx.globalAlpha = Math.max(0, p.life);
+      if (p.star) {
+        ctx.fillStyle = '#fff85d';
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.life * 5);
+        ctx.fillRect(-p.r, -1, p.r * 2, 2);
+        ctx.fillRect(-1, -p.r, 2, p.r * 2);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawBird() {
+    ctx.save();
+    ctx.translate(bird.x, bird.y);
+    ctx.rotate(bird.rot);
+
+    // 影で浮いている感じを出す
+    // 羽（はばたきで回転＋拡縮させる）
+    const flapA = Math.sin(bird.wing * Math.PI * 2);
+    ctx.save();
+    ctx.translate(-4, 2);
+    ctx.rotate(-0.4 + flapA * 0.9);
+    ctx.fillStyle = '#ffb347';
+    ctx.strokeStyle = '#e08a2d';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.ellipse(-8, 0, 12, 7 - flapA * 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // 体
+    const bodyG = ctx.createLinearGradient(0, -14, 0, 14);
+    bodyG.addColorStop(0, '#fff3a0');
+    bodyG.addColorStop(1, '#ffd93d');
+    ctx.fillStyle = bodyG;
+    ctx.strokeStyle = '#e0a52d';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, bird.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // ほっぺ
+    ctx.fillStyle = 'rgba(255,140,170,.75)';
+    ctx.beginPath(); ctx.arc(2, 4, 4.5, 0, Math.PI * 2); ctx.fill();
+
+    // 目（白目＋黒目＋光でかわいく）
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(6, -5, 6.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#333';
+    ctx.beginPath(); ctx.arc(7.5, -5, 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(8.5, -6, 1.3, 0, Math.PI * 2); ctx.fill();
+
+    // くちばし
+    ctx.fillStyle = '#ff8c42';
+    ctx.strokeStyle = '#d96a1e';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(11, -1);
+    ctx.lineTo(20, 1.5);
+    ctx.lineTo(11, 4.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawTapHint() {
+    // 準備中だけ操作ヒントを点滅させる
+    if (Math.floor(frames / 30) % 2 === 0) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(255,255,255,.95)';
+      ctx.strokeStyle = '#ff7fb2';
+      ctx.lineWidth = 3;
+      const w = 190, h = 44;
+      const x = (W - w) / 2, y = bird.y + 90;
+      roundRect(x, y, w, h, 22);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#ff6fa5';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('タップ / Space ではばたく', W / 2, y + 28);
+      ctx.restore();
+    }
+  }
+
+  // --- ループ（dtでfps差を吸収して滑らかにする） ---
+  let lastTime = 0;
+  function loop(t) {
+    const dt = Math.min(2.5, (t - lastTime) / 16.666 || 1);
+    lastTime = t;
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // --- 入力 ---
+  function press() {
+    if (state === 'ready') startGame();
+    else if (state === 'play') flap();
+    else if (state === 'over' && overTimer > 35) startGame();
+  }
+
+  document.getElementById('startBtn').addEventListener('click', (e) => { e.stopPropagation(); startGame(); });
+  document.getElementById('retryBtn').addEventListener('click', (e) => { e.stopPropagation(); startGame(); });
+  document.getElementById('gameBox').addEventListener('pointerdown', (e) => { e.preventDefault(); press(); });
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); press(); }
+    if (e.code === 'Enter' && state !== 'play') press();
+  });
+  // 長押し連打でも音が詰まらないよう、指が離れたら再タップ可能にする程度に留める
+
+  bestScoreEl.textContent = best;
+  initScenery();
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
