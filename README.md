@@ -9,4 +9,5 @@ HIGH
 | ClaudeCode| Claude Sonnet5 / Opus5 / Fable5|
 | Codex | GPT5.6 Terra |
 | Antigravity| Gemini 3.7 Flash Gemini 3.8 Flash|
+| None       | Sarashina |
 ###
