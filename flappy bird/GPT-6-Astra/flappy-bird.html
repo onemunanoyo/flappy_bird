@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f8f5ec">
+  <meta name="description" content="A little bird, a big sky. A cozy, hand-drawn Canvas flying game. Tap to flap and find your flow.">
+  <title>Little Wings — a tiny sky adventure</title>
+  <style>
+    :root { color-scheme: light; --ink:#294b43; --muted:#78877b; --cream:#f8f5ec; --coral:#ef876b; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100svh; background:var(--cream); color:var(--ink); font-family:ui-rounded,"Avenir Next",Avenir,"Trebuchet MS",sans-serif; }
+    body::before { content:""; position:fixed; inset:0; pointer-events:none; opacity:.22; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23849073' opacity='.2' filter='url(%23n)' d='M0 0h180v180H0z'/%3E%3C/svg%3E"); }
+    button { font:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+    button:focus-visible, .stage:focus-visible { outline:3px solid #326e60; outline-offset:5px; }
+    .page { width:min(1120px,calc(100% - 64px)); margin:auto; padding:38px 0 25px; position:relative; }
+    header { display:flex; align-items:center; justify-content:space-between; margin-bottom:29px; gap:20px; }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .brand-mark { width:46px; height:46px; display:grid; place-items:center; background:#f7d39d; border-radius:16px 16px 16px 5px; transform:rotate(-7deg); }
+    .brand-mark svg { width:32px; transform:rotate(7deg); }
+    h1 { margin:0; font-size:25px; letter-spacing:-1px; font-weight:850; }
+    .brand p { margin:3px 0 0; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); }
+    .top-note { font-size:12px; display:flex; gap:9px; align-items:center; color:#7a877b; }
+    .top-note span { width:7px; height:7px; background:#98ad82; border-radius:50%; }
+    .stage { height:clamp(440px,67svh,640px); position:relative; overflow:hidden; border-radius:24px; background:#dceee4; isolation:isolate; box-shadow:0 16px 45px #4e624510,0 0 0 1px #506e4715; touch-action:none; user-select:none; }
+    canvas { display:block; width:100%; height:100%; }
+    .hud { position:absolute; inset:24px 26px auto; display:flex; justify-content:space-between; align-items:flex-start; pointer-events:none; z-index:4; }
+    .record { display:flex; align-items:center; gap:9px; background:#fffaf0b8; border:1px solid #ffffff90; padding:10px 14px; border-radius:12px; font-size:12px; backdrop-filter:blur(8px); }
+    .record svg { width:16px; height:16px; color:#b98d4d; }
+    .record strong { font-size:15px; }
+    .tools { display:flex; gap:8px; pointer-events:auto; }
+    .icon-button { width:39px; height:39px; display:grid; place-items:center; border:1px solid #ffffff90; border-radius:12px; background:#fffaf0c7; color:var(--ink); transition:background .2s,transform .2s; }
+    .icon-button:hover { background:#fffdf5; transform:translateY(-2px); }
+    .icon-button svg { width:18px; height:18px; }
+    #pauseButton:disabled { opacity:.4; cursor:default; transform:none; }
+    #score { position:absolute; left:50%; top:24px; transform:translateX(-50%); color:#fffdf5; font-size:62px; font-weight:900; line-height:1; text-shadow:0 3px 0 #54796640; -webkit-text-stroke:1px #54796625; opacity:0; transition:opacity .2s; pointer-events:none; z-index:2; }
+    #score.visible { opacity:1; }
+    .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:20px; z-index:3; }
+    .overlay[hidden] { display:none; }
+    .card { text-align:center; width:350px; max-width:100%; padding:31px 30px 25px; background:#fffcf1ed; border:1px solid #fffdf8; border-radius:25px; box-shadow:0 14px 45px #486e5112; backdrop-filter:blur(10px); animation:arrive .35s ease-out; }
+    @keyframes arrive { from { opacity:0; transform:translateY(12px) scale(.98); } to { opacity:1; transform:none; } }
+    .eyebrow { font-size:10px; text-transform:uppercase; letter-spacing:2.7px; font-weight:800; color:#9a9a7b; }
+    .hero-bird { width:89px; height:77px; margin:14px auto 7px; animation:bob 2.8s ease-in-out infinite; }
+    @keyframes bob { 50% { transform:translateY(-7px) rotate(-4deg); } }
+    .card h2 { font-size:38px; letter-spacing:-1.8px; line-height:1.1; margin:7px 0 12px; font-weight:900; }
+    .card p { color:#7d8b7c; font-size:14px; line-height:1.7; margin:0 auto 22px; }
+    .primary { border:0; width:100%; padding:15px 22px; border-radius:13px; background:var(--coral); color:#fffdf4; box-shadow:0 4px 0 #ce6e58; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:10px; transition:transform .15s,background .15s; }
+    .primary:hover { background:#e97a60; transform:translateY(-1px); }
+    .primary:active { transform:translateY(3px); box-shadow:0 1px 0 #ce6e58; }
+    .primary svg { width:17px; height:17px; }
+    .hint { color:#98a08b; font-size:11px; margin-top:18px; }
+    kbd { font-family:inherit; font-size:10px; border:1px solid #d9ddc9; border-bottom-width:2px; border-radius:4px; padding:2px 5px; background:#faf9ef; }
+    .results { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:20px 0 24px; }
+    .result { padding:14px; border-radius:14px; background:#eef1e3; }
+    .result span { display:block; font-size:10px; text-transform:uppercase; letter-spacing:1.7px; color:#8a947b; margin-bottom:7px; }
+    .result strong { font-size:32px; }
+    .medal { font-size:36px; margin:14px 0; }
+    .footer { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:23px 4px 0; font-size:12px; color:#8a9585; }
+    .controls { display:flex; align-items:center; gap:18px; }
+    .controls span { display:flex; align-items:center; gap:7px; }
+    .footer .motto { font-style:italic; font-family:Georgia,serif; font-size:14px; color:#929984; }
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+    @media(max-width:600px) { .page { width:calc(100% - 28px); padding-top:20px; } header { margin-bottom:20px; } h1 { font-size:23px; } .brand p { font-size:9px; letter-spacing:1.5px; } .top-note { display:none; } .stage { height:clamp(460px,72svh,700px); border-radius:20px; } .hud { inset:17px 15px auto; } .record { padding:9px 10px; } #score { top:70px; font-size:50px; } .card { padding:26px 24px 23px; width:310px; } .card h2 { font-size:34px; } .footer { padding:19px 3px 0; justify-content:center; } .footer .motto { display:none; } .controls { gap:14px; font-size:10px; } }
+    @media(prefers-reduced-motion:reduce) { .hero-bird { animation:none; } .card { animation:none; } button { transition:none!important; } }
+  </style>
+</head>
+<body>
+<main class="page">
+  <header>
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M8 26C4 14 13 7 24 10c8 2 10 10 6 17-5 8-18 9-22-1Z" fill="#fff6d6"/><path d="M8 22c-3-8 8-8 11-1 2 7-6 10-11 1Z" fill="#e6a45d"/><path d="m30 18 8 4-9 3" fill="#e27e5f"/><circle cx="26" cy="17" r="2" fill="#294b43"/></svg></div>
+      <div><h1>little wings</h1><p>a tiny sky adventure</p></div>
+    </div>
+    <div class="top-note"><span></span>A small escape. One flap at a time.</div>
+  </header>
+  <section class="stage" id="stage" tabindex="0" aria-label="Little Wings game. Press Space, Arrow Up, or tap to flap. P pauses the game.">
+    <canvas id="game" aria-label="A yellow bird flying between green pipes above a flower meadow"></canvas>
+    <div class="hud">
+      <div class="record"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M8 3h8v7a4 4 0 0 1-8 0V3ZM8 5H4v3a4 4 0 0 0 4 4m8-7h4v3a4 4 0 0 1-4 4M12 14v5m-4 2h8m-7-2h6"/></svg><span>BEST</span><strong id="best">0</strong></div>
+      <div class="tools">
+        <button class="icon-button" id="soundButton" aria-label="Mute sound" aria-pressed="false" title="Sound on / off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m11 4-6 5H2v6h3l6 5V4Z"/><path id="soundWaves" d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg></button>
+        <button class="icon-button" id="pauseButton" aria-label="Pause game" title="Pause (P)" disabled><svg viewBox="0 0 24 24" fill="currentColor"><path id="pauseIcon" d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg></button>
+      </div>
+    </div>
+    <div id="score" aria-hidden="true">0</div>
+    <div class="overlay" id="startOverlay">
+      <div class="card">
+        <div class="eyebrow">a little moment of play</div>
+        <svg class="hero-bird" viewBox="0 0 110 90" aria-hidden="true"><ellipse cx="53" cy="81" rx="23" ry="4" fill="#dfe4ce"/><path d="M27 43 10 34l5 21 16 4" fill="#e8ae60"/><path d="M25 49c0-24 16-35 36-31 21 3 28 23 20 41-10 24-56 22-56-10Z" fill="#f3c86d"/><path d="M39 53c-1-13 13-15 19-5 11 19-12 24-19 5Z" fill="#e5aa54"/><path d="m80 39 19 8-19 7" fill="#ed8d69"/><ellipse cx="70" cy="36" rx="4" ry="5" fill="#344d42"/><circle cx="71" cy="34" r="1.2" fill="white"/><ellipse cx="72" cy="50" rx="6" ry="3.5" fill="#eea27a"/><path d="m48 19-4-10m9 8 2-10" stroke="#d9a252" stroke-width="3" stroke-linecap="round"/></svg>
+        <h2>Small bird.<br>Big adventure.</h2>
+        <p>Find your rhythm, catch the breeze,<br>and see how far you can fly.</p>
+        <button class="primary" id="startButton">Let’s fly <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></button>
+        <div class="hint">Tap anywhere or press <kbd>space</kbd> to flap</div>
+      </div>
+    </div>
+    <div class="overlay" id="overOverlay" hidden>
+      <div class="card">
+        <div class="eyebrow" id="endEyebrow">every flight is a fresh start</div>
+        <div class="medal" aria-hidden="true">🌼</div>
+        <h2 id="endTitle">A lovely little flight.</h2>
+        <p id="endMessage">Take a breath. The sky is waiting.</p>
+        <div class="results"><div class="result"><span>Your score</span><strong id="finalScore">0</strong></div><div class="result"><span>Personal best</span><strong id="finalBest">0</strong></div></div>
+        <button class="primary" id="restartButton">One more flight <span aria-hidden="true">↗</span></button>
+        <div class="hint">You’re only one flap away.</div>
+      </div>
+    </div>
+    <div class="overlay" id="pauseOverlay" hidden><div class="card"><div class="eyebrow">a moment to breathe</div><div class="medal" aria-hidden="true">☁️</div><h2>Just floating.</h2><p>Your little adventure can wait.</p><button class="primary" id="resumeButton">Keep flying <span aria-hidden="true">→</span></button><div class="hint">Or press <kbd>P</kbd> to resume</div></div></div>
+  </section>
+  <div class="footer"><div class="controls"><span><kbd>space</kbd> / tap to flap</span><span><kbd>P</kbd> pause</span><span><kbd>M</kbd> sound</span></div><span class="motto">A little courage goes a long way.</span></div>
+  <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
+</main>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const canvas = $('game'), ctx = canvas.getContext('2d'), stage = $('stage');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const H = 600, GROUND = 535, STEP = 1 / 120;
+  let W = 1000, state = 'ready', score = 0, best = 0, muted = false;
+  let bird = { x:240, y:260, vy:0, radius:15, flap:0, angle:0 };
+  let pipes = [], particles = [], distance = 0, time = 0, gameTime = 0;
+  let accumulator = 0, lastTime = 0, deathTime = 0, flash = 0, newBest = false;
+  let audio = null;
+  try { best = Math.max(0, Number(localStorage.getItem('little-wings-best')) || 0); muted = localStorage.getItem('little-wings-muted') === 'true'; } catch (_) {}
+  $('best').textContent = best;
+
+  function resize() {
+    const bounds = stage.getBoundingClientRect(), oldW = W;
+    W = bounds.width / bounds.height * H;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(bounds.width * dpr);
+    canvas.height = Math.round(bounds.height * dpr);
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    const oldX = bird.x;
+    bird.x = Math.max(72, Math.min(260, W * .25));
+    if (oldW !== W) pipes.forEach(pipe => pipe.x += bird.x - oldX);
+  }
+  new ResizeObserver(resize).observe(stage);
+  resize();
+
+  function ensureAudio() {
+    if (muted) return;
+    try { if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume().catch(() => {}); } catch (_) {}
+  }
+  function tone(freq, end, duration, volume = .04, delay = 0, type = 'sine') {
+    if (muted || !audio || audio.state !== 'running') return;
+    const start = audio.currentTime + delay, osc = audio.createOscillator(), gain = audio.createGain();
+    osc.type = type; osc.frequency.setValueAtTime(freq, start); osc.frequency.exponentialRampToValueAtTime(end, start + duration);
+    gain.gain.setValueAtTime(.0001, start); gain.gain.exponentialRampToValueAtTime(volume, start + .01); gain.gain.exponentialRampToValueAtTime(.0001, start + duration);
+    osc.connect(gain); gain.connect(audio.destination); osc.start(start); osc.stop(start + duration + .02);
+    osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+  }
+  function updateSound() {
+    $('soundButton').setAttribute('aria-label', muted ? 'Unmute sound' : 'Mute sound');
+    $('soundButton').setAttribute('aria-pressed', String(muted));
+    $('soundWaves').setAttribute('d', muted ? 'm16 9 6 6m0-6-6 6' : 'M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14');
+  }
+  function toggleSound() { muted = !muted; try { localStorage.setItem('little-wings-muted', muted); } catch (_) {} updateSound(); ensureAudio(); }
+  updateSound();
+
+  function hideOverlays() { ['startOverlay','overOverlay','pauseOverlay'].forEach(id => $(id).hidden = true); }
+  function startGame() {
+    ensureAudio(); hideOverlays(); state = 'playing'; score = 0; gameTime = 0; pipes = []; particles = []; flash = 0; newBest = false;
+    bird.y = 250; bird.vy = 0; bird.angle = 0; bird.flap = 0;
+    $('score').textContent = '0'; $('score').classList.add('visible'); $('pauseButton').disabled = false;
+    $('pauseButton').setAttribute('aria-label', 'Pause game'); $('pauseIcon').setAttribute('d', 'M6 5h4v14H6zm8 0h4v14h-4z');
+    addPipe(Math.max(W + 70, bird.x + 380));
+    $('announcement').textContent = 'Flight started. Tap or press Space to flap.';
+    stage.focus({ preventScroll:true }); flap();
+  }
+  function flap() {
+    bird.vy = -410; bird.flap = 1;
+    tone(420, 780, .09, .024);
+    if (!reducedMotion) for (let i = 0; i < 3; i++) particles.push({ x:bird.x - 13, y:bird.y + 8, vx:-40 - Math.random()*55, vy:10 + Math.random()*30, life:.5, max:.5, size:2 + Math.random()*3, color:'#fff4c9' });
+  }
+  function addPipe(x) {
+    const gap = Math.max(174, 196 - score * 1.1);
+    const previous = pipes.length ? pipes[pipes.length - 1].center : 270;
+    const center = Math.max(150, Math.min(385, previous + (Math.random() - .5) * 220));
+    pipes.push({ x, width:72, center, gap, scored:false });
+  }
+  function die() {
+    if (state !== 'playing') return;
+    state = 'dying'; deathTime = 0; flash = reducedMotion ? 0 : .3; newBest = score > best;
+    if (newBest) { best = score; try { localStorage.setItem('little-wings-best', best); } catch (_) {} }
+    $('best').textContent = best; $('pauseButton').disabled = true;
+    tone(240, 90, .25, .045, 0, 'triangle');
+    if (!reducedMotion) for (let i = 0; i < 10; i++) particles.push({ x:bird.x, y:bird.y, vx:(Math.random()-.5)*200, vy:-Math.random()*140, life:.65, max:.65, size:3+Math.random()*4, color:i%2 ? '#f8d581' : '#fff5dc' });
+  }
+  function showGameOver() {
+    state = 'over'; $('overOverlay').hidden = false; $('score').classList.remove('visible');
+    $('finalScore').textContent = score; $('finalBest').textContent = best;
+    $('endEyebrow').textContent = newBest ? 'a new personal best!' : 'every flight is a fresh start';
+    $('endTitle').textContent = newBest ? 'Look at you fly!' : 'A lovely little flight.';
+    $('endMessage').textContent = score === 0 ? 'Little taps make big adventures. Try again!' : 'Take a breath. The sky is waiting.';
+    $('announcement').textContent = `Game over. Score ${score}. Personal best ${best}.${newBest ? ' A new record!' : ''}`;
+    $('restartButton').focus({ preventScroll:true });
+  }
+  function pauseGame() {
+    if (state !== 'playing' && state !== 'paused') return;
+    state = state === 'playing' ? 'paused' : 'playing';
+    $('pauseOverlay').hidden = state !== 'paused';
+    $('pauseButton').setAttribute('aria-label', state === 'paused' ? 'Resume game' : 'Pause game');
+    $('pauseIcon').setAttribute('d', state === 'paused' ? 'M7 4v16l13-8z' : 'M6 5h4v14H6zm8 0h4v14h-4z');
+    $('announcement').textContent = state === 'paused' ? 'Game paused.' : 'Flight resumed.';
+    if (state === 'paused') $('resumeButton').focus({ preventScroll:true }); else stage.focus({ preventScroll:true });
+  }
+  function action() {
+    ensureAudio();
+    if (state === 'ready') startGame();
+    else if (state === 'playing') flap();
+    else if (state === 'over' && deathTime > .9) startGame();
+  }
+  $('startButton').addEventListener('click', startGame);
+  $('restartButton').addEventListener('click', startGame);
+  $('resumeButton').addEventListener('click', pauseGame);
+  $('pauseButton').addEventListener('click', pauseGame);
+  $('soundButton').addEventListener('click', toggleSound);
+  stage.addEventListener('pointerdown', e => {
+    if (e.target.closest('button') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    e.preventDefault(); action();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.repeat || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); pauseGame(); }
+    else if (e.code === 'KeyM') { e.preventDefault(); toggleSound(); }
+    else if (e.code === 'Space' || e.code === 'ArrowUp') {
+      if (e.code === 'Space' && document.activeElement.tagName === 'BUTTON') return;
+      e.preventDefault(); action();
+    }
+  });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing') pauseGame(); lastTime = 0; accumulator = 0; });
+  window.addEventListener('blur', () => { if (state === 'playing') pauseGame(); });
+
+  function circleRect(x, y, r, rx, ry, rw, rh) {
+    const dx = x - Math.max(rx, Math.min(x, rx+rw)), dy = y - Math.max(ry, Math.min(y, ry+rh));
+    return dx*dx + dy*dy < r*r;
+  }
+  function hitsPipe(p) {
+    const top = p.center - p.gap/2, bottom = p.center + p.gap/2;
+    return circleRect(bird.x,bird.y,bird.radius,p.x,0,p.width,top) || circleRect(bird.x,bird.y,bird.radius,p.x-5,top-25,p.width+10,25) || circleRect(bird.x,bird.y,bird.radius,p.x,bottom,p.width,GROUND-bottom) || circleRect(bird.x,bird.y,bird.radius,p.x-5,bottom,p.width+10,25);
+  }
+  function update(dt) {
+    if (state === 'paused') return;
+    time += dt;
+    flash = Math.max(0, flash-dt);
+    if (state === 'playing') {
+      gameTime += dt;
+      const speed = Math.min(245, 185 + score * 2);
+      distance += speed * dt;
+      bird.vy = Math.min(680, bird.vy + 1350 * dt); bird.y += bird.vy*dt;
+      bird.flap = Math.max(0, bird.flap - dt*5);
+      const target = Math.max(-.38, Math.min(1.3, bird.vy / 600));
+      bird.angle += (target-bird.angle) * Math.min(1, dt*10);
+      pipes.forEach(p => p.x -= speed*dt);
+      if (bird.y-bird.radius < 0 || bird.y+bird.radius > GROUND || pipes.some(hitsPipe)) die();
+      if (state === 'playing') {
+        for (const p of pipes) if (!p.scored && p.x+p.width+5 < bird.x-bird.radius) {
+          p.scored = true; score++; $('score').textContent = score;
+          tone(660, 660, .11, .035); tone(990, 990, .16, .03, .09);
+        }
+        const last = pipes[pipes.length-1];
+        if (last && last.x < W-215) addPipe(last.x+285);
+        pipes = pipes.filter(p => p.x+p.width > -20);
+      }
+    } else if (state === 'ready') {
+      if (!reducedMotion) distance += 25*dt;
+      bird.y = 270 + (reducedMotion ? 0 : Math.sin(time*2.5)*9); bird.angle = -.1;
+    } else if (state === 'dying') {
+      deathTime += dt; bird.vy = Math.min(700,bird.vy+1500*dt); bird.y = Math.min(GROUND-16,bird.y+bird.vy*dt);
+      bird.angle += (1.4-bird.angle)*dt*6;
+      if (deathTime > .7) showGameOver();
+    } else if (state === 'over') deathTime += dt;
+    for (const p of particles) { p.x += p.vx*dt; p.y += p.vy*dt; p.life -= dt; p.vy += dt*50; }
+    particles = particles.filter(p => p.life>0);
+  }
+
+  function ellipse(x,y,rx,ry,color) { ctx.fillStyle=color; ctx.beginPath(); ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2); ctx.fill(); }
+  function roundRect(x,y,w,h,r,color,stroke) { if (h<=0) return; ctx.beginPath(); ctx.roundRect(x,y,w,h,r); ctx.fillStyle=color; ctx.fill(); if (stroke) { ctx.strokeStyle=stroke; ctx.lineWidth=2; ctx.stroke(); } }
+  function cloud(x,y,s,alpha) {
+    ctx.save(); ctx.translate(x,y); ctx.scale(s,s); ctx.globalAlpha=alpha;
+    ctx.fillStyle='#fffdf1'; ctx.beginPath(); ctx.moveTo(-45,16); ctx.bezierCurveTo(-64,12,-58,-12,-39,-13); ctx.bezierCurveTo(-42,-41,0,-50,11,-24); ctx.bezierCurveTo(26,-38,51,-22,48,-6); ctx.bezierCurveTo(70,-8,78,18,52,21); ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  function hills(base,amp,period,speed,color) {
+    const offset=distance*speed;
+    ctx.beginPath(); ctx.moveTo(0,H);
+    for (let x=0;x<=W+8;x+=8) ctx.lineTo(x,base+Math.sin((x+offset)/period)*amp+Math.cos((x+offset)/(period*.57))*amp*.22);
+    ctx.lineTo(W,H); ctx.closePath(); ctx.fillStyle=color; ctx.fill();
+  }
+  function tree(x,y,s,color,canopy) {
+    ctx.save();ctx.translate(x,y);ctx.scale(s,s);
+    ctx.strokeStyle=color;ctx.lineWidth=5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-66);ctx.moveTo(0,-25);ctx.lineTo(-15,-40);ctx.moveTo(0,-40);ctx.lineTo(15,-54);ctx.stroke();
+    ellipse(0,-82,34,42,canopy);ellipse(-22,-64,25,29,canopy);ellipse(22,-66,25,31,canopy);
+    ctx.strokeStyle=color+'65';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,-40);ctx.lineTo(0,-92);ctx.moveTo(0,-65);ctx.lineTo(-17,-78);ctx.moveTo(0,-77);ctx.lineTo(15,-90);ctx.stroke();ctx.restore();
+  }
+  function drawBackground() {
+    const sky=ctx.createLinearGradient(0,0,0,GROUND);sky.addColorStop(0,'#dbeee5');sky.addColorStop(.6,'#eef0dc');sky.addColorStop(1,'#f8e7c8');ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+    const sunX=W*.79;
+    ellipse(sunX,116,67,67,'#f6e7b63b');ellipse(sunX,116,51,51,'#fff0c267');ellipse(sunX,116,35,35,'#fff2c7');
+    for(let i=0;i<Math.ceil(W/280)+2;i++) { const x=((i*287+70-distance*.085)%(W+330)+(W+330))%(W+330)-140;cloud(x,95+(i%3)*64,.55+(i%3)*.18,.62); }
+    ctx.strokeStyle='#809d8c50';ctx.lineWidth=1.7;ctx.lineCap='round';
+    for(let i=0;i<3;i++) { const x=W*.64+i*22-distance*.025%(W+100),y=205+(i%2)*12;ctx.beginPath();ctx.moveTo(x-5,y+2);ctx.quadraticCurveTo(x-2,y-3,x,y);ctx.quadraticCurveTo(x+3,y-3,x+7,y+1);ctx.stroke(); }
+    hills(380,45,160,.11,'#cbdcc6'); hills(428,35,100,.22,'#b4cdb4');
+    for(let i=0;i<Math.ceil(W/240)+2;i++){const x=((i*243-distance*.32)%(W+300)+(W+300))%(W+300)-100;tree(x,493+(i%2)*10,.55+(i%3)*.13,'#8eaa8d',i%2?'#c5d4a9':'#dfcbb0');}
+    hills(493,18,85,.4,'#9fbea0');
+    for(let i=0;i<Math.ceil(W/140)+2;i++){const x=((i*147-distance*.55)%(W+180)+(W+180))%(W+180)-70;ellipse(x,535,60,30,'#a9c397');ellipse(x+28,530,32,30,'#b6ca9f');}
+  }
+  function drawPipe(p) {
+    const top=p.center-p.gap/2,bottom=p.center+p.gap/2;
+    const grad=ctx.createLinearGradient(p.x,0,p.x+p.width,0);grad.addColorStop(0,'#8caf86');grad.addColorStop(.25,'#accb99');grad.addColorStop(.7,'#a3c491');grad.addColorStop(1,'#81a87e');
+    roundRect(p.x,-12,p.width,top+12,7,grad,'#759973');
+    roundRect(p.x,bottom,p.width,GROUND-bottom+5,7,grad,'#759973');
+    ctx.fillStyle='#d4e4b55e';ctx.fillRect(p.x+10,0,6,Math.max(0,top-25));ctx.fillRect(p.x+10,bottom+25,6,GROUND-bottom-25);
+    roundRect(p.x-5,top-25,p.width+10,25,6,'#b4cd9d','#789d76');
+    roundRect(p.x-5,bottom,p.width+10,25,6,'#b4cd9d','#789d76');
+    ctx.fillStyle='#d7e6b9';ctx.fillRect(p.x+2,top-21,p.width-4,3);ctx.fillRect(p.x+2,bottom+4,p.width-4,3);
+    ctx.strokeStyle='#638e6759';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(p.x+p.width-12,bottom+58);ctx.quadraticCurveTo(p.x+p.width-33,bottom+83,p.x+p.width-13,bottom+110);ctx.stroke();
+    ctx.save();ctx.translate(p.x+p.width-20,bottom+77);ctx.rotate(-.65);ellipse(0,0,9,4,'#749d70');ctx.restore();
+    ctx.save();ctx.translate(p.x+p.width-17,bottom+96);ctx.rotate(.5);ellipse(0,0,8,4,'#749d70');ctx.restore();
+  }
+  function drawGround() {
+    ctx.fillStyle='#f1e5c6';ctx.fillRect(0,GROUND,W,H-GROUND);
+    ctx.fillStyle='#84a77a';ctx.fillRect(0,GROUND,W,5);
+    ctx.fillStyle='#c4d3a2';ctx.fillRect(0,GROUND+5,W,9);
+    ctx.fillStyle='#e3d7b5';ctx.fillRect(0,GROUND+14,W,2);
+    for(let i=0;i<Math.ceil(W/35)+2;i++){
+      const x=i*35-distance%35;ctx.strokeStyle='#a1b88b';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x,GROUND+3);ctx.lineTo(x-3,GROUND-3);ctx.moveTo(x,GROUND+3);ctx.lineTo(x+3,GROUND-1);ctx.stroke();
+    }
+    for(let i=0;i<Math.ceil(W/86)+2;i++){
+      const x=i*86-distance%86,y=GROUND+32+(i%3)*10;
+      ellipse(x,y,2,1,'#d2c8a6');ellipse(x+34,y+9,1.5,1,'#d2c8a6');
+      if(i%3===0){ctx.strokeStyle='#91ab7c';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x+16,GROUND+6);ctx.lineTo(x+16,GROUND-10);ctx.stroke();for(let k=0;k<5;k++)ellipse(x+16+Math.cos(k*Math.PI*2/5)*4,GROUND-12+Math.sin(k*Math.PI*2/5)*4,3.2,3.2,'#fff8df');ellipse(x+16,GROUND-12,2.4,2.4,'#e4b86b');}
+    }
+  }
+  function drawBird() {
+    if(state==='ready' && W<650) return;
+    const shadowScale=Math.max(.2,1-(GROUND-bird.y)/420);
+    ellipse(bird.x,GROUND+2,22*shadowScale,4*shadowScale,'#58784820');
+    ctx.save();ctx.translate(bird.x,bird.y);ctx.rotate(bird.angle);
+    ctx.fillStyle='#dca655';ctx.beginPath();ctx.moveTo(-15,-3);ctx.lineTo(-30,-12);ctx.lineTo(-25,6);ctx.lineTo(-13,10);ctx.fill();
+    ellipse(0,0,23,20,'#f5ca70');ellipse(5,8,16,11,'#f9dc8c');
+    ctx.strokeStyle='#dca759';ctx.lineWidth=2.6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-5,-18);ctx.quadraticCurveTo(-12,-28,-10,-27);ctx.moveTo(-1,-20);ctx.lineTo(1,-27);ctx.stroke();
+    ctx.save();ctx.translate(-9,3);const wing=state==='playing'?bird.flap:state==='ready'?.5+Math.sin(time*9)*.2:0;ctx.rotate(-.3+wing*1.2);ellipse(-4,4,12,8,'#dfa957');ctx.strokeStyle='#cd9849';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(-5,2,7,.3,2);ctx.stroke();ctx.restore();
+    ctx.fillStyle='#ee906c';ctx.beginPath();ctx.moveTo(18,-2);ctx.lineTo(32,3);ctx.quadraticCurveTo(27,9,18,8);ctx.fill();
+    ellipse(13,-7,3.2,4.2,'#344b3b');ellipse(14,-8.2,1,1.3,'#fffbed');ellipse(12,4,5,3,'#efa17b');
+    ctx.restore();
+  }
+  function render() {
+    drawBackground();pipes.forEach(drawPipe);drawGround();
+    for(const p of particles){ctx.globalAlpha=p.life/p.max;ellipse(p.x,p.y,p.size,p.size*.55,p.color);}ctx.globalAlpha=1;
+    drawBird();
+    if(flash>0){ctx.fillStyle=`rgba(255,250,225,${flash})`;ctx.fillRect(0,0,W,H);}
+  }
+  function frame(now) {
+    if(!lastTime) lastTime=now;
+    accumulator+=Math.min((now-lastTime)/1000,.05);lastTime=now;
+    while(accumulator>=STEP){update(STEP);accumulator-=STEP;}
+    render();requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
