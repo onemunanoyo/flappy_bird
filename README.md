@@ -9,5 +9,5 @@ HIGH
 | ClaudeCode| Claude Sonnet5 / Opus5 / Fable5|
 | Codex | GPT5.6 Terra GPT6 Astra|
 | Antigravity| Gemini 3.7 Flash Gemini 3.8 Flash|
-| None       | Sarashina mini |
+| None       | Sarashina mini PLaMo-3.1-Prime|
 ###
